@@ -2,15 +2,11 @@
 
 import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
-type VerificationVerdict =
-  | "AUTHENTIC_EXACT"
-  | "AUTHENTIC_SIMILAR"
-  | "REGISTERED_BUT_REVOKED"
-  | "NOT_REGISTERED"
-  | string;
+type DisplayStatus = "AUTHENTICATED" | "NOT_AUTHENTICATED" | "UNAVAILABLE";
 
 type VerificationResult = {
-  verdict: VerificationVerdict;
+  verdict: string;
+  displayStatus: DisplayStatus;
   similarityDistance: number | null;
   authentic: boolean;
   videoId: number | null;
@@ -46,12 +42,6 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
-function shortDid(value: string | null) {
-  if (!value) return "확인되지 않음";
-  if (value.length < 30) return value;
-  return `${value.slice(0, 18)}…${value.slice(-8)}`;
-}
-
 export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -73,9 +63,10 @@ export default function Home() {
 
   const resultTone = useMemo(() => {
     if (!result) return "neutral";
-    if (result.authentic && result.active) return "authentic";
-    if (result.verdict === "NOT_REGISTERED") return "unknown";
-    return "warning";
+    const status = result.displayStatus;
+    if (status === "AUTHENTICATED") return "authentic";
+    if (status === "UNAVAILABLE") return "warning";
+    return "unknown";
   }, [result]);
 
   function selectFile(nextFile?: File) {
@@ -208,21 +199,17 @@ export default function Home() {
                 <div className="result-seal">{resultTone === "authentic" ? "✓" : resultTone === "unknown" ? "?" : "!"}</div>
                 <div>
                   <span className="result-kicker">VERIFICATION COMPLETE</span>
-                  <h2>{resultTone === "authentic" ? "진본으로 확인됐습니다" : resultTone === "unknown" ? "등록 기록이 없습니다" : "주의가 필요한 영상입니다"}</h2>
+                  <h2>{resultTone === "authentic" ? "진본 인증" : resultTone === "unknown" ? "미인증" : "확인 중"}</h2>
                   <p>{result.message}</p>
                 </div>
               </div>
 
-              <div className="evidence-grid">
-                <div><span>블록체인 기록</span><strong className={result.blockchainVerified ? "pass" : "fail"}>{result.blockchainVerified ? "검증 완료" : "확인 안 됨"}</strong></div>
-                <div><span>디지털 자격증명</span><strong className={result.vcVerified ? "pass" : "fail"}>{result.vcVerified ? "VC 유효" : "확인 안 됨"}</strong></div>
-                <div><span>등록 상태</span><strong className={result.active ? "pass" : "fail"}>{result.active ? "활성" : "비활성"}</strong></div>
-                <div><span>등록 시각</span><strong>{formatDate(result.registeredAt)}</strong></div>
-              </div>
-
-              {result.issuerDid && (
-                <div className="did-row"><span>발급자 DID</span><code title={result.issuerDid}>{shortDid(result.issuerDid)}</code></div>
+              {result.registeredAt && (
+                <div className="evidence-grid">
+                  <div><span>등록일</span><strong>{formatDate(result.registeredAt)}</strong></div>
+                </div>
               )}
+
               {result.notice && <p className="result-notice">※ {result.notice}</p>}
               <button className="again-button" type="button" onClick={reset}>다른 영상 확인하기</button>
             </div>
