@@ -26,7 +26,7 @@ type ApiResponse = {
   data?: VerificationResult;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8070";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://3.34.244.155.sslip.io";
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 function formatBytes(bytes: number) {
@@ -117,7 +117,7 @@ export default function Home() {
       const message = caught instanceof Error ? caught.message : "알 수 없는 오류가 발생했습니다.";
       setError(
         message === "Failed to fetch"
-          ? "검증 서버에 연결할 수 없습니다. 백엔드가 8070 포트에서 실행 중인지 확인해 주세요."
+          ? "검증 서버에 연결할 수 없습니다. 네트워크 상태와 백엔드 주소를 확인해 주세요."
           : message,
       );
     } finally {
