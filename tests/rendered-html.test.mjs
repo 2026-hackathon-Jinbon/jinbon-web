@@ -22,6 +22,9 @@ test("server-renders the Jinbon verification experience", async () => {
   assert.match(html, /<title>진본 \| 영상 진본 검증<\/title>/i);
   assert.match(html, /이 영상은/);
   assert.match(html, /진본 여부 확인하기/);
-  assert.match(html, /블록체인 검증 네트워크 연결됨/);
+  assert.match(html, /하나의 영상, 세 겹의 확인/);
+  assert.match(html, /원본 미보관/);
+  assert.match(html, /미인증이 곧 위조나 딥페이크를 의미하지는 않습니다/);
+  assert.doesNotMatch(html, /블록체인 검증 네트워크 연결됨/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
