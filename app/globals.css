@@ -55,6 +55,23 @@ h1 em { font-style: normal; color: #2457E6; }
 .step-rail .active > span { background: var(--primary); color: white; border-color: var(--primary); }
 .step-rail .done > span { background: #EEF4FF; color: var(--primary); border-color: #EEF4FF; }
 .step-rail .icon { width: 13px; height: 13px; }
+.mode-tabs { display: flex; gap: 6px; margin-bottom: 16px; background: #F2F4F7; border-radius: 8px; padding: 4px; }
+.mode-tabs button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 12px; border: none; border-radius: 6px; background: transparent; font-size: 12px; font-weight: 600; color: #667085; transition: background .2s, color .2s, box-shadow .2s; }
+.mode-tabs button .icon { width: 14px; height: 14px; }
+.mode-tabs button.active { background: white; color: var(--primary); box-shadow: 0 1px 3px #10182810; }
+.mode-tabs button:not(.active):hover:not(:disabled) { color: #344054; }
+.mode-tabs button:disabled { opacity: .5; }
+.url-input-zone { background: #F7F9FF; border: 1px solid #B2C6F5; border-radius: 10px; padding: 24px 20px; min-height: 180px; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+.url-input-wrap { display: flex; align-items: center; gap: 10px; background: white; border: 1px solid #D0D5DD; border-radius: 8px; padding: 0 14px; transition: border-color .2s, box-shadow .2s; }
+.url-input-wrap:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px #2457E620; }
+.url-input-wrap > .icon { width: 18px; height: 18px; color: #667085; flex-shrink: 0; }
+.url-input { flex: 1; border: none; outline: none; padding: 13px 0; font-size: 13px; background: transparent; min-width: 0; }
+.url-input::placeholder { color: #98A2B3; }
+.url-clear { width: 28px; height: 28px; display: grid; place-items: center; border: none; background: #F2F4F7; border-radius: 5px; flex-shrink: 0; color: #667085; transition: background .15s; }
+.url-clear:hover:not(:disabled) { background: #EAECF0; }
+.url-clear .icon { width: 12px; height: 12px; }
+.url-platforms { margin: 0; font-size: 11px; color: #667085; display: flex; align-items: center; gap: 5px; }
+.url-platforms .icon { width: 13px; height: 13px; color: var(--primary); }
 .drop-zone { background: #F7F9FF; border: 1px dashed #B2C6F5; border-radius: 10px; min-height: 267px; transition: background .2s, border-color .2s; overflow: hidden; }
 .drop-zone.dragging { background: #EEF4FF; border-color: var(--primary); }
 .drop-prompt { display: flex; flex-direction: column; align-items: center; width: 100%; min-height: 265px; background: transparent; border: none; padding: 20px 10px 19px; }

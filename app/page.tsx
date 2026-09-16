@@ -11,7 +11,8 @@ type VerificationResult = {
 };
 
 type ApiResponse = { message: string; data?: VerificationResult };
-type IconName = "shield" | "upload" | "arrow" | "lock" | "file" | "fingerprint" | "link" | "check" | "close";
+type VerifyMode = "file" | "url";
+type IconName = "shield" | "upload" | "arrow" | "lock" | "file" | "fingerprint" | "link" | "check" | "close" | "globe";
 
 function Icon({ name, className = "" }: { name: IconName; className?: string }) {
   const paths: Record<IconName, React.ReactNode> = {
@@ -23,6 +24,7 @@ function Icon({ name, className = "" }: { name: IconName; className?: string }) 
     fingerprint: <><path d="M5 9a7 7 0 0 1 14 0v4m-17 0V9a10 10 0 0 1 20 0M5 13v2c0 2-1 4-2 5m5-4v-6a4 4 0 0 1 8 0v5c0 3 1 5 2 6m-6-11v7c0 2-1 4-2 5m5 0-1-3" /></>,
     link: <><path d="m10 13 4-4m-6 6-2 2a4 4 0 0 1-5-6l5-5a4 4 0 0 1 6 0m0 12a4 4 0 0 0 6 0l5-5a4 4 0 0 0-6-5l-2 2" transform="translate(1 0) scale(.92)" /></>,
     check: <path d="m5 12 4 4L19 6" />,
+    globe: <><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></>,
     close: <path d="m6 6 12 12M6 18 18 6" />,
   };
   return <svg className={`icon ${className}`} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
@@ -30,6 +32,8 @@ function Icon({ name, className = "" }: { name: IconName; className?: string }) 
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://3.34.244.155.sslip.io";
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const MAX_URL_LENGTH = 2048;
+const SUPPORTED_PLATFORMS = ["YouTube", "Instagram", "TikTok", "X(Twitter)", "Vimeo"];
 const steps = ["영상 선택", "기록 대조", "결과 확인"];
 const methods: { icon: IconName; title: string; label: string; description: string }[] = [
   { icon: "fingerprint", title: "영상의 고유한 흔적을 찾고", label: "DIGITAL FINGERPRINT", description: "파일과 프레임의 고유한 해시를 분석해 등록된 원본과 비교합니다." },
@@ -40,7 +44,7 @@ const faqs = [
   { question: "진본은 무엇을 확인하는 서비스인가요?", answer: "선택한 영상이 진본에 등록된 원본과 일치하는지 확인하는 서비스입니다. 파일·프레임 해시, 블록체인 등록 기록, OpenDID 디지털 자격증명을 교차 검증합니다. 영상에 담긴 사건이나 주장 자체가 사실인지를 판단하는 서비스는 아닙니다." },
   { question: "‘미인증’이면 가짜 영상인가요?", answer: "아니요. 아직 등록되지 않았거나, 자격증명을 확인할 수 없는 경우에도 미인증으로 표시될 수 있습니다. 미인증이 곧 위조나 딥페이크를 의미하지는 않습니다. 결과와 함께 제공되는 설명을 확인해 주세요." },
   { question: "업로드한 영상은 어떻게 처리되나요?", answer: "선택한 영상은 검증을 위해 서버로 전송됩니다. 영상 원본은 서버에 저장하지 않으며, 파일과 프레임을 분석해 기존 등록 기록과 대조합니다." },
-  { question: "어떤 영상을 확인할 수 있나요?", answer: "MP4, MOV, AVI 등의 영상 파일을 최대 100MB까지 선택할 수 있습니다. 코덱이나 파일 상태에 따라 분석이 어려울 수 있으며, 이 경우 결과 안내에 따라 다른 파일로 다시 시도해 주세요." },
+  { question: "어떤 영상을 확인할 수 있나요?", answer: "MP4, MOV, AVI 등의 영상 파일을 최대 100MB까지 직접 업로드하거나, YouTube·Instagram·TikTok·X(Twitter)·Vimeo URL을 입력해 확인할 수 있습니다. URL 검증은 서버에서 전체 영상을 다운로드해 분석하므로 더 정밀한 프레임 비교가 가능합니다." },
 ];
 
 function formatBytes(bytes: number) {
@@ -55,9 +59,11 @@ function formatDate(value: string) {
 export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLHeadingElement>(null);
+  const [mode, setMode] = useState<VerifyMode>("file");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [url, setUrl] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VerificationResult | null>(null);
@@ -67,6 +73,16 @@ export default function Home() {
   }, [previewUrl]);
 
   useEffect(() => { if (result) resultRef.current?.focus(); }, [result]);
+
+  function switchMode(next: VerifyMode) {
+    if (isVerifying || next === mode) return;
+    setMode(next);
+    setError(null);
+    setResult(null);
+    setFile(null);
+    setPreviewUrl(null);
+    setUrl("");
+  }
 
   function selectFile(nextFile?: File) {
     if (isVerifying || !nextFile) return;
@@ -89,15 +105,33 @@ export default function Home() {
     selectFile(event.dataTransfer.files?.[0]);
   }
 
+  function validateUrl(): string | null {
+    const trimmed = url.trim();
+    if (!trimmed) return "URL을 입력해 주세요.";
+    if (trimmed.length > MAX_URL_LENGTH) return "URL은 최대 2,048자까지 가능합니다.";
+    try { const parsed = new URL(trimmed); if (parsed.protocol !== "https:") return "HTTPS URL만 지원합니다."; } catch { return "올바른 URL 형식이 아닙니다."; }
+    return null;
+  }
+
   async function verifyVideo() {
-    if (!file || isVerifying) return;
+    if (mode === "file" && !file) return;
+    if (mode === "url") {
+      const urlError = validateUrl();
+      if (urlError) { setError(urlError); return; }
+    }
+    if (isVerifying) return;
     setIsVerifying(true);
     setError(null);
     setResult(null);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await fetch(`${API_BASE_URL}/api/verify`, { method: "POST", body: formData });
+      let response: Response;
+      if (mode === "file") {
+        const formData = new FormData();
+        formData.append("file", file!);
+        response = await fetch(`${API_BASE_URL}/api/verify`, { method: "POST", body: formData });
+      } else {
+        response = await fetch(`${API_BASE_URL}/api/verify/url`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: url.trim() }) });
+      }
       const payload = (await response.json().catch(() => null)) as ApiResponse | null;
       if (!response.ok || !payload?.data) throw new Error(payload?.message || "검증 서버가 요청을 처리하지 못했습니다.");
       setResult(payload.data);
@@ -107,8 +141,9 @@ export default function Home() {
     } finally { setIsVerifying(false); }
   }
 
-  function reset() { setFile(null); setPreviewUrl(null); setResult(null); setError(null); }
+  function reset() { setFile(null); setPreviewUrl(null); setUrl(""); setResult(null); setError(null); }
 
+  const hasInput = mode === "file" ? !!file : !!url.trim();
   const currentStep = result ? 2 : isVerifying ? 1 : 0;
   const resultTone = result?.displayStatus === "AUTHENTICATED" ? "authentic" : result?.displayStatus === "UNAVAILABLE" ? "unavailable" : "unknown";
 
@@ -139,18 +174,35 @@ export default function Home() {
 
             {!result ? (
               <div className="workspace" aria-busy={isVerifying}>
-                <div className={`drop-zone ${isDragging && !isVerifying ? "dragging" : ""} ${file ? "has-file" : ""}`} onDragEnter={(event) => { event.preventDefault(); if (!isVerifying) setIsDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsDragging(false); }} onDrop={onDrop}>
-                  {file ? <div className="file-preview">
-                    {previewUrl && <video src={previewUrl} controls preload="metadata" aria-label="선택한 영상 미리보기" />}
-                    <div className="file-meta"><Icon name="file" /><div><strong title={file.name}>{file.name}</strong><small>{formatBytes(file.size)} · 검증할 영상</small></div><button type="button" onClick={reset} disabled={isVerifying} aria-label="선택한 영상 제거"><Icon name="close" /></button></div>
-                  </div> : <button className="drop-prompt" type="button" onClick={() => inputRef.current?.click()} aria-describedby="file-rule">
-                    <span className="upload-art"><span className="upload-sheet sheet-back" /><span className="upload-sheet"><Icon name="file" /></span><span className="upload-symbol"><Icon name="upload" /></span></span>
-                    <strong>확인하고 싶은 영상을 놓아주세요</strong><span className="drop-description">파일을 끌어다 놓거나 아래를 눌러 선택하세요</span><span className="choose-file">영상 파일 선택 <Icon name="upload" /></span><span className="file-rule" id="file-rule">MP4, MOV, AVI 등 · 최대 100MB</span>
-                  </button>}
+                <div className="mode-tabs" role="tablist" aria-label="검증 방식 선택">
+                  <button role="tab" aria-selected={mode === "file"} className={mode === "file" ? "active" : ""} onClick={() => switchMode("file")} disabled={isVerifying}><Icon name="upload" /> 파일 업로드</button>
+                  <button role="tab" aria-selected={mode === "url"} className={mode === "url" ? "active" : ""} onClick={() => switchMode("url")} disabled={isVerifying}><Icon name="globe" /> URL 검증</button>
                 </div>
+
+                {mode === "file" ? (
+                  <div className={`drop-zone ${isDragging && !isVerifying ? "dragging" : ""} ${file ? "has-file" : ""}`} onDragEnter={(event) => { event.preventDefault(); if (!isVerifying) setIsDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsDragging(false); }} onDrop={onDrop}>
+                    {file ? <div className="file-preview">
+                      {previewUrl && <video src={previewUrl} controls preload="metadata" aria-label="선택한 영상 미리보기" />}
+                      <div className="file-meta"><Icon name="file" /><div><strong title={file.name}>{file.name}</strong><small>{formatBytes(file.size)} · 검증할 영상</small></div><button type="button" onClick={reset} disabled={isVerifying} aria-label="선택한 영상 제거"><Icon name="close" /></button></div>
+                    </div> : <button className="drop-prompt" type="button" onClick={() => inputRef.current?.click()} aria-describedby="file-rule">
+                      <span className="upload-art"><span className="upload-sheet sheet-back" /><span className="upload-sheet"><Icon name="file" /></span><span className="upload-symbol"><Icon name="upload" /></span></span>
+                      <strong>확인하고 싶은 영상을 놓아주세요</strong><span className="drop-description">파일을 끌어다 놓거나 아래를 눌러 선택하세요</span><span className="choose-file">영상 파일 선택 <Icon name="upload" /></span><span className="file-rule" id="file-rule">MP4, MOV, AVI 등 · 최대 100MB</span>
+                    </button>}
+                  </div>
+                ) : (
+                  <div className="url-input-zone">
+                    <div className="url-input-wrap">
+                      <Icon name="globe" />
+                      <input type="url" className="url-input" placeholder="https://youtube.com/watch?v=..." value={url} onChange={(e) => { setUrl(e.target.value); setError(null); }} onKeyDown={(e) => { if (e.key === "Enter" && !isVerifying) verifyVideo(); }} disabled={isVerifying} aria-label="검증할 영상 URL" />
+                      {url && <button type="button" className="url-clear" onClick={() => { setUrl(""); setError(null); }} disabled={isVerifying} aria-label="URL 지우기"><Icon name="close" /></button>}
+                    </div>
+                    <p className="url-platforms"><Icon name="check" /> 지원 플랫폼: {SUPPORTED_PLATFORMS.join(", ")}</p>
+                  </div>
+                )}
+
                 {error && <div className="error-message" role="alert">{error}</div>}
-                <div className="verification-status" role="status">{isVerifying ? <><span className="spinner" /> 영상과 등록 기록을 대조하고 있어요. 잠시만 기다려 주세요.</> : file ? <><Icon name="check" /> 영상이 준비됐어요. 아래 버튼으로 검증을 시작하세요.</> : "영상을 선택하면 진본 여부를 확인할 수 있어요."}</div>
-                <button className="verify-button" type="button" disabled={!file || isVerifying} onClick={verifyVideo}>{isVerifying ? <>진본 기록 대조 중 <span className="spinner" /></> : <>진본 여부 확인하기 <Icon name="arrow" /></>}</button>
+                <div className="verification-status" role="status">{isVerifying ? <><span className="spinner" /> {mode === "url" ? "영상을 다운로드하고 기록을 대조하고 있어요. 잠시만 기다려 주세요." : "영상과 등록 기록을 대조하고 있어요. 잠시만 기다려 주세요."}</> : hasInput ? <><Icon name="check" /> {mode === "url" ? "URL이 준비됐어요. 아래 버튼으로 검증을 시작하세요." : "영상이 준비됐어요. 아래 버튼으로 검증을 시작하세요."}</> : mode === "url" ? "영상 URL을 입력하면 진본 여부를 확인할 수 있어요." : "영상을 선택하면 진본 여부를 확인할 수 있어요."}</div>
+                <button className="verify-button" type="button" disabled={!hasInput || isVerifying} onClick={verifyVideo}>{isVerifying ? <>진본 기록 대조 중 <span className="spinner" /></> : <>진본 여부 확인하기 <Icon name="arrow" /></>}</button>
               </div>
             ) : (
               <div className={`result-panel ${resultTone}`}>
@@ -158,7 +210,7 @@ export default function Home() {
                 <span className="section-label">{resultTone === "unavailable" ? "VERIFICATION UNAVAILABLE" : "VERIFICATION RESULT"}</span>
                 <h3 ref={resultRef} tabIndex={-1}>{resultTone === "authentic" ? "진본 인증을 확인했어요" : resultTone === "unknown" ? "진본 인증이 확인되지 않았어요" : "지금은 확인할 수 없어요"}</h3>
                 <p className="result-message">{result.message}</p>
-                <dl className="result-details"><div><dt>확인한 영상</dt><dd title={file?.name}>{file?.name}</dd></div>{result.registeredAt && <div><dt>원본 등록일</dt><dd>{formatDate(result.registeredAt)}</dd></div>}</dl>
+                <dl className="result-details"><div><dt>확인한 영상</dt><dd title={mode === "url" ? url : file?.name}>{mode === "url" ? url : file?.name}</dd></div>{result.registeredAt && <div><dt>원본 등록일</dt><dd>{formatDate(result.registeredAt)}</dd></div>}</dl>
                 {result.notice && <p className="result-notice">{result.notice}</p>}
                 {resultTone === "unknown" && <p className="result-notice">미인증은 위조나 딥페이크 판정을 의미하지 않습니다.</p>}
                 {resultTone === "unavailable" && <button className="verify-button" type="button" onClick={verifyVideo}>다시 확인하기 <Icon name="arrow" /></button>}
