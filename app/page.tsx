@@ -4,7 +4,13 @@ import Image from "next/image";
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 
 type VerificationResult = {
-  displayStatus: "AUTHENTICATED" | "NOT_AUTHENTICATED" | "UNAVAILABLE";
+  displayStatus: "AUTHENTICATED" | "CONTENT_SIMILAR" | "PARTIAL_SIMILAR" | "NOT_AUTHENTICATED" | "UNAVAILABLE";
+  verdict?: string;
+  registrantName?: string | null;
+  videoId?: number | null;
+  blockchainVerified?: boolean;
+  vcVerified?: boolean;
+  vcClaimsBound?: boolean;
   registeredAt: string | null;
   message: string;
   notice: string | null;
@@ -41,6 +47,7 @@ const methods: { icon: IconName; title: string; label: string; description: stri
   { icon: "shield", title: "자격증명까지 교차 검증해요", label: "VERIFIABLE CREDENTIAL", description: "OpenDID 디지털 자격증명의 유효성을 확인해 검증의 근거를 더합니다." },
 ];
 const faqs = [
+  { question: "공인 등록자는 누구인가요?", answer: "모바일 신분증으로 본인확인을 완료한 진본 등록자입니다. 기관 소속이나 공식 발행 권한을 별도로 인증했다는 뜻은 아닙니다." },
   { question: "진본은 무엇을 확인하는 서비스인가요?", answer: "선택한 영상이 진본에 등록된 원본과 일치하는지 확인하는 서비스입니다. 파일·프레임 해시, 블록체인 등록 기록, OpenDID 디지털 자격증명을 교차 검증합니다. 영상에 담긴 사건이나 주장 자체가 사실인지를 판단하는 서비스는 아닙니다." },
   { question: "‘미인증’이면 가짜 영상인가요?", answer: "아니요. 아직 등록되지 않았거나, 자격증명을 확인할 수 없는 경우에도 미인증으로 표시될 수 있습니다. 미인증이 곧 위조나 딥페이크를 의미하지는 않습니다. 결과와 함께 제공되는 설명을 확인해 주세요." },
   { question: "업로드한 영상은 어떻게 처리되나요?", answer: "선택한 영상은 검증을 위해 서버로 전송됩니다. 영상 원본은 서버에 저장하지 않으며, 파일과 프레임을 분석해 기존 등록 기록과 대조합니다." },
@@ -147,6 +154,10 @@ export default function Home() {
   const currentStep = result ? 2 : isVerifying ? 1 : 0;
   const resultTone = result?.displayStatus === "AUTHENTICATED" ? "authentic" : result?.displayStatus === "UNAVAILABLE" ? "unavailable" : "unknown";
 
+  const comparisonPending = result?.displayStatus === "CONTENT_SIMILAR" || result?.displayStatus === "PARTIAL_SIMILAR";
+  const verificationMethod = result?.verdict === "EXACT_MATCH" ? "원본 파일 정확 일치"
+    : result?.verdict === "SIMILAR_MATCH" || result?.verdict === "SAME_CONTENT" ? "영상·음성 비교" : null;
+
   return (
     <>
       <a className="skip-link" href="#verify">영상 확인으로 바로가기</a>
@@ -163,7 +174,7 @@ export default function Home() {
           <div className="hero-story">
             <div className="eyebrow"><span /> 신뢰할 수 있는 콘텐츠의 시작</div>
             <h1 id="hero-title">이 영상은<br />진짜일까요?<br /><em>기록으로 확인하세요.</em></h1>
-            <p className="hero-copy">보이는 것 너머, 믿을 수 있는 근거.<br />진본은 영상의 고유한 흔적과 등록 기록을 대조해<br className="desktop-break" /> 콘텐츠의 진본 여부를 확인합니다.</p>
+            <p className="hero-copy">영상을 믿고 공유하기 전, 출처와 원본을 확인하세요.<br />모바일 신분증 기반 공인 영상 진본 증명 플랫폼.<br className="desktop-break" /> 등록자의 영상 기록과 영상·음성을 함께 확인합니다.</p>
             <a className="text-link" href="#how-it-works">진본은 어떻게 확인하나요? <Icon name="arrow" /></a>
           </div>
 
@@ -208,9 +219,14 @@ export default function Home() {
               <div className={`result-panel ${resultTone}`}>
                 <span className="result-seal">{resultTone === "authentic" ? <Icon name="shield" /> : resultTone === "unavailable" ? "!" : "?"}</span>
                 <span className="section-label">{resultTone === "unavailable" ? "VERIFICATION UNAVAILABLE" : "VERIFICATION RESULT"}</span>
-                <h3 ref={resultRef} tabIndex={-1}>{resultTone === "authentic" ? "진본 인증을 확인했어요" : resultTone === "unknown" ? "진본 인증이 확인되지 않았어요" : "지금은 확인할 수 없어요"}</h3>
+                <h3 ref={resultRef} tabIndex={-1}>{resultTone === "authentic" ? "진본 확인 완료" : comparisonPending ? "진본 확인 보류" : result?.verdict === "NOT_REGISTERED" ? "등록 기록 없음" : resultTone === "unknown" ? "진본 인증이 확인되지 않았어요" : "지금은 확인할 수 없어요"}</h3>
                 <p className="result-message">{result.message}</p>
-                <dl className="result-details"><div><dt>확인한 영상</dt><dd title={mode === "url" ? url : file?.name}>{mode === "url" ? url : file?.name}</dd></div>{result.registeredAt && <div><dt>원본 등록일</dt><dd>{formatDate(result.registeredAt)}</dd></div>}</dl>
+                <dl className="result-details"><div><dt>확인한 영상</dt><dd title={mode === "url" ? url : file?.name}>{mode === "url" ? url : file?.name}</dd></div>{result.registeredAt && <div><dt>등록 시점</dt><dd>{formatDate(result.registeredAt)}</dd></div>}
+                  {result.registrantName && <div><dt>등록자 표시명</dt><dd>{result.registrantName}</dd></div>}
+                  {verificationMethod && <div><dt>확인 방식</dt><dd>{verificationMethod}</dd></div>}
+                  {result.videoId != null && <div><dt>등록 증거</dt><dd>{result.blockchainVerified && result.vcVerified && result.vcClaimsBound ? "블록체인·등록 보증서 확인됨" : "검증 미완료"}</dd></div>}
+                </dl>
+                {result.registrantName && <p className="result-notice">등록자 표시명은 기관 소속·직함의 인증을 뜻하지 않습니다.</p>}
                 {result.notice && <p className="result-notice">{result.notice}</p>}
                 {resultTone === "unknown" && <p className="result-notice">미인증은 위조나 딥페이크 판정을 의미하지 않습니다.</p>}
                 {resultTone === "unavailable" && <button className="verify-button" type="button" onClick={verifyVideo}>다시 확인하기 <Icon name="arrow" /></button>}

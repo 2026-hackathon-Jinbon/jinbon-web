@@ -17,13 +17,13 @@ export async function generateMetadata(): Promise<Metadata> {
       apple: [{ url: "/jinbon-logo.png", type: "image/png", sizes: "180x180" }],
     },
     openGraph: {
-      title: "진본 | 영상의 진실을 확인하다",
-      description: "블록체인 등록 기록과 OpenDID 자격증명으로 영상의 진본 여부를 확인하세요.",
+      title: "진본 | 모바일 신분증 기반 영상 진본 증명",
+      description: "영상을 믿고 공유하기 전, 출처와 원본을 확인하세요. 모바일 신분증 기반 공인 영상 진본 증명 플랫폼.",
       images: [{ url: `${origin}/jinbon-share.png`, width: 1024, height: 1024, alt: "진본 영상 진본 검증" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "진본 | 영상의 진실을 확인하다",
+      title: "진본 | 모바일 신분증 기반 영상 진본 증명",
       description: "블록체인과 OpenDID로 영상의 진본 여부를 확인하세요.",
       images: [`${origin}/jinbon-share.png`],
     },
